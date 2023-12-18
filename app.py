@@ -128,7 +128,8 @@ def run():
                 color='variable:N',
                 tooltip=['track_name', 'variable', 'value']
             ).properties(
-                height=600
+                height=600,
+                width=200
             )
 
 
@@ -191,7 +192,6 @@ def run():
                     # INSTEAD OF PASSING MANUALLY THE FEATURES, WE CAN DO IT LIKE THIS
                     
                     mean_features = filtered_df[features].mean()
-                    print(mean_features[0])
                         
                     # Create a spider plot
                     fig = go.Figure(data=go.Scatterpolar(
