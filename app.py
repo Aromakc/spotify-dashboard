@@ -1,6 +1,8 @@
 import streamlit as st
 from streamlit.logger import get_logger
 from component.metrics import show_metrics
+from component.search import searchArtistSong
+from component.top_10 import top_10_tracks, top_10_artists, top_10_charts_spotify
 import component.sidebar as sb
 import pandas as pd
 import numpy as np
@@ -24,93 +26,33 @@ def run():
   
     @st.cache_data
     def load_data():
-        return pd.read_pickle('rsc\\spotify2023.pkl')
+        return pd.read_pickle('./rsc/spotify2023.pkl')
 
     main_df = load_data()
-    
     
     df = sb.show_sidebar(main_df)
     
     #Main Window
-    
     with st.expander("Data Preview"):
         st.dataframe(df)
     
     tab1, tab2, tab3 = st.tabs(["Data Metrics", "Data Comparison", "Song Analysis"])
     
-    with tab1:
-          
-        # show metrics
+    with tab1:    
         show_metrics(df)
         
-
-        # show ttitle with a margin
         st.markdown("<hr>", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-
 
         col1, col2 = st.columns(2)
         with col1:
-            st.subheader("Top 10 Tracks")
-            grouped_df = df.groupby('track_name')['streams'].sum().reset_index()
-            sorted_df = grouped_df.sort_values('streams', ascending=False).head(10)
-
-            chart = alt.Chart(sorted_df).mark_bar().encode(
-                x='streams',
-                y=alt.Y('track_name', sort='-x',title='Track'),
-            ).properties(
-                width=600,
-                height=400
-            )
-            st.altair_chart(chart)
+            top_10_tracks(df)
+            
         with col2:
-            st.subheader("Top 10 Artists")
-            df['artist_name'] = df['artist_name'].str.split(',')
-            df = df.explode('artist_name')
-
-            df['artist_name'] = df['artist_name'].str.strip()
-
-            # Group by artist_name and count unique track_name entries
-            grouped_df = df.groupby('artist_name')['track_name'].nunique().reset_index()
-
-            
-            sorted_df = grouped_df.sort_values('track_name', ascending=False).head(10)
-
-            chart = alt.Chart(sorted_df).mark_bar().encode(
-                y=alt.Y('artist_name', sort='-x', title='Artist', axis=alt.Axis(labelOverlap=True)),
-                x=alt.X('track_name', title='track'),
+            top_10_artists(df)
                 
-            ).properties(
-                width=600,
-                height=400
-            )
-            st.altair_chart(chart)
-        
-            
         st.subheader("Top Charts")
-        
         with st.container(border=True):
-            st.subheader("Spotify")
-            grouped_df = df.groupby('track_name').agg({'in_spotify_charts': 'sum', 'in_spotify_playlists': 'sum', 'streams': 'sum'}).reset_index()
-
-            non_zero_grouped_df = grouped_df[grouped_df['in_spotify_charts'] > 0]
-
-            sorted_df = non_zero_grouped_df.sort_values('in_spotify_charts', ascending=True)
-            sorted_df = sorted_df[sorted_df['in_spotify_charts'] == 1]
-
-            melted_df = sorted_df.melt(id_vars='track_name', value_vars=['streams', 'in_spotify_playlists'])
-            
-            #stacked bar chart
-            chart = alt.Chart(melted_df).mark_bar().encode(
-                x=alt.X('value', scale=alt.Scale(type='log'), title='Value (Log Scale)'),
-                y=alt.Y('track_name', sort='-x', title='Track'),
-                color='variable',
-                tooltip=['track_name', 'variable', 'value']
-            ).properties(
-                width=1000,
-                height=500
-            )
-            st.altair_chart(chart)
+            top_10_charts_spotify(df)
     
     with tab2:
 
@@ -166,56 +108,8 @@ def run():
                         
                         
     with tab3:
-        search_input = st.text_input("Search for an artist or track")
-    
-        search_button = st.button("Search")
-
-        if search_button:
-            search_input = search_input.lower()
-
-            # Check if the input is a track name or artist name
-            if search_input in df['track_name'].str.lower().values or search_input in df['artist_name'].str.lower().values:
-                # Filter the dataframe based on the search input
-                filtered_df = df[(df['artist_name'].str.lower().str.contains(search_input)) | (df['track_name'].str.lower().str.contains(search_input))]
-
-                if not filtered_df.empty:
-                    # Sort the dataframe in decreasing order of streams
-                    sorted_df = filtered_df.sort_values('streams', ascending=False)
-                    # Display the dataframe
-                    st.header(f"Search results for '{search_input}'")
-                    st.subheader(f"Each Song Details of {search_input}")
-                    st.dataframe(sorted_df)
-
-                    # Create a spider plot for the searched artist in the sorted dataframe
-                    features = ["danceability", "valence", "energy", "acousticness", "instrumentalness", "liveness", "speechiness"]
-
-                    # INSTEAD OF PASSING MANUALLY THE FEATURES, WE CAN DO IT LIKE THIS
-                    
-                    mean_features = filtered_df[features].mean()
-                        
-                    # Create a spider plot
-                    fig = go.Figure(data=go.Scatterpolar(
-                        r=mean_features,
-                        theta=features,
-                        fill='toself'
-                    ))
-
-                    fig.update_layout(
-                        polar=dict(
-                            radialaxis=dict(
-                                visible=True,
-                                range=[0, 100]                        
-                            )),
-                        showlegend=False,
-                        height=600,                         
-                    )
-                    st.header(f"Feature of songs of {search_input}")
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.write("No results found for your search.")
-            else:
-                st.write("Please enter a valid search query.")
-        
+        searchArtistSong(df)        
+          
     
 if __name__ == "__main__":
     run()
